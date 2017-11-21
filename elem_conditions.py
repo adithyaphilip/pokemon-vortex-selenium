@@ -20,6 +20,10 @@ def get_move_arrow_tag_conditions():
     return "img", [lambda elem: elem.get_attribute("class") == "activeArrow"]
 
 
+def get_battle_attack_select_conditions():
+    return "input", [lambda elem: elem.get_attribute('name') == 'attack']
+
+
 def get_battle_wild_tag_conditions():
     return "input", [lambda elem: elem.get_attribute("value") == "Battle!"]
 

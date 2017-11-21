@@ -72,6 +72,10 @@ def get_battle_info(driver: webdriver.Chrome):
     return battle_btn, pokemon_name, pokemon_level, is_captured
 
 
+def should_capture_pokemon(pokemon_name: str):
+    return any(elem in pokemon_name for elem in ["Mystic", "Ancient", "Dark", "Shiny", "Shadow", "Metallic"])
+
+
 def get_enemy_health_during_battle(driver: webdriver.Chrome):
     return int(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/table/tbody/tr[1]/td[1]/strong')
                .text.replace("HP: ", "").strip())
@@ -109,7 +113,11 @@ def get_all_elements(tag_condition_func, driver: webdriver.Chrome):
     for elem in driver.find_elements_by_tag_name(elem_tag):
         all_true = True
         for condition in conditions:
-            if not condition(elem):
+            try:
+                if not condition(elem):
+                    all_true = False
+                    break
+            except:
                 all_true = False
                 break
 

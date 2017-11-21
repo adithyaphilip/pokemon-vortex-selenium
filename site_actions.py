@@ -8,6 +8,7 @@ import const
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
 
 import time
 import random
@@ -22,6 +23,7 @@ caught_failed_ctr = 0
 battled_ctr = 0
 avg_caught_hp = 0
 avg_caught_failed_hp = 0
+login_ctr = 0
 
 
 def login(username, password, driver: webdriver.Chrome):
@@ -29,6 +31,8 @@ def login(username, password, driver: webdriver.Chrome):
         assumes we want to do a fresh login and navigates to the login page
         returns true on successful login, false otherwise
     """
+    global login_ctr
+    login_ctr += 1
     driver.get(site_utils.get_login_url())
     if not site_utils.is_login_page(driver):
         monitor_utils.error("Login page no longer contains required login elements. Login failed!")
@@ -73,8 +77,17 @@ def search_pokemon(driver: webdriver.Chrome):
             "Looks like we aren't on the map for some reason (no clickable arrows were found) and search_pokemon was called!")
         return False
     chosen_arrow = random.choice(arrows)
-    site_utils.click_on_element_naturally(chosen_arrow, driver)
+    site_utils.click_by_script(chosen_arrow, driver)
     return True
+
+
+def execute_random_attack(driver: webdriver.Chrome):
+    attack_elems = site_utils.get_all_elements(elem_conditions.get_battle_attack_select_conditions, driver)
+    chosen_att_elem = random.choice(attack_elems)
+    site_utils.click_by_script(chosen_att_elem, driver)
+    time.sleep(SLEEP_BATTLE_ACTIONS)
+    site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input[10]'), driver)
+    time.sleep(SLEEP_BATTLE_ACTIONS)
 
 
 def try_catch_pokemon(driver: webdriver.Chrome, ball_val: int):
@@ -91,36 +104,30 @@ def try_catch_pokemon(driver: webdriver.Chrome, ball_val: int):
 def do_actual_battle(driver: webdriver.Chrome, pokemon_name: str, pokemon_level: int, is_captured: bool):
     time.sleep(SLEEP_BATTLE_ACTIONS)
     # we assume to start at the choose your pokemon screen
-    while True:
-        # click on "Continue" to enter the battle. Loop because sometimes it doesn't change pages
-        try:
-            site_utils.click_on_element_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/p/input'),
-                                                  driver)
-            driver.find_element_by_xpath(r'//*[@id="battleForm"]/p/input').submit()
-        except:
-            break
+    # click on "Continue" to enter the battle.
+    site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/p/input'), driver)
     time.sleep(SLEEP_BATTLE_ACTIONS)
 
     # click on "Attack!"
-    driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input[10]').submit()
-    time.sleep(SLEEP_BATTLE_ACTIONS)
+    # driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input[10]').submit()
+    # time.sleep(SLEEP_BATTLE_ACTIONS)
+    enemy_health = site_utils.get_enemy_health_during_battle(driver)
+    own_health = site_utils.get_own_health_during_battle(driver)
     while True:
-        enemy_health = site_utils.get_enemy_health_during_battle(driver)
-        own_health = site_utils.get_own_health_during_battle(driver)
-        if enemy_health == 0 or own_health == 0:
-            break
+        # if enemy_health == 0 or own_health == 0:
+        #     break
         # to "Continue" after an attack
-        site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input'), driver)
-        time.sleep(SLEEP_BATTLE_ACTIONS)
+        # site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input'), driver)
+        # time.sleep(SLEEP_BATTLE_ACTIONS)
 
         # try and catch before next attack
-        if enemy_health <= pokemon_const.CAPTURE_HP_LIMIT and not is_captured:
+        if enemy_health <= pokemon_const.CAPTURE_HP_LIMIT and not is_captured and site_utils.should_capture_pokemon(pokemon_name):
             for _ in range(pokemon_const.CAPTURE_TIMES_LIMIT):
                 global caught_ctr
                 global caught_failed_ctr
                 global avg_caught_hp
                 global avg_caught_failed_hp
-                if try_catch_pokemon(driver, inventory_const.GREAT_BALL):
+                if try_catch_pokemon(driver, inventory_const.ULTRA_BALL):
                     caught_ctr += 1
                     avg_caught_hp = (avg_caught_hp * (caught_ctr - 1) + enemy_health) / caught_ctr
                     monitor_utils.debug("Caught Level %d %s at %d HP" % (pokemon_level, pokemon_name, enemy_health))
@@ -140,7 +147,13 @@ def do_actual_battle(driver: webdriver.Chrome, pokemon_name: str, pokemon_level:
                         return do_actual_battle(driver, pokemon_name, pokemon_level, is_captured)
 
         # click on "Attack!"
-        site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input[10]'), driver)
+        execute_random_attack(driver)
+        enemy_health = site_utils.get_enemy_health_during_battle(driver)
+        own_health = site_utils.get_own_health_during_battle(driver)
+        if own_health == 0 or enemy_health == 0:
+            break
+        # to "Continue" after an attack
+        site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input'), driver)
         time.sleep(SLEEP_BATTLE_ACTIONS)
 
     # to "Continue" at the end of a fight
@@ -183,11 +196,12 @@ if __name__ == '__main__':
     while True:
         # try:
         login("gameburger2", "darealgameburger", driver2)
-        while not move_to_map(1, driver2):
+        while not move_to_map(12, driver2):
             login("gameburger2", "darealgameburger", driver2)
         while True:
-            monitor_utils.debug("Battled: %d Caught: %d Catch Failed: %d Avg. Catch HP: %f Avg. Catch Fail HP: %f"
-                                % (battled_ctr, caught_ctr, caught_failed_ctr, avg_caught_hp, avg_caught_failed_hp))
+            monitor_utils.debug(
+                "Battled: %d Caught: %d Catch Failed: %d Avg. Catch HP: %f Avg. Catch Fail HP: %f Logged in: %d"
+                % (battled_ctr, caught_ctr, caught_failed_ctr, avg_caught_hp, avg_caught_failed_hp, login_ctr))
             if not do_battle_if_exists(driver2):
                 search_pokemon(driver2)
                 # except Exception as e:
