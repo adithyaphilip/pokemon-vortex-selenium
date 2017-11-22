@@ -82,7 +82,12 @@ def search_pokemon(driver: webdriver.Chrome):
 
 
 def execute_random_attack(driver: webdriver.Chrome):
-    attack_elems = site_utils.get_all_elements(elem_conditions.get_battle_attack_select_conditions, driver)
+    for _ in range(10):
+        attack_elems = site_utils.get_all_elements(elem_conditions.get_battle_attack_select_conditions, driver)
+        if len(attack_elems) != 0:
+            break
+        time.sleep(SLEEP_BATTLE_ACTIONS)
+
     chosen_att_elem = random.choice(attack_elems)
     site_utils.click_by_script(chosen_att_elem, driver)
     time.sleep(SLEEP_BATTLE_ACTIONS)
@@ -121,7 +126,8 @@ def do_actual_battle(driver: webdriver.Chrome, pokemon_name: str, pokemon_level:
         # time.sleep(SLEEP_BATTLE_ACTIONS)
 
         # try and catch before next attack
-        if enemy_health <= pokemon_const.CAPTURE_HP_LIMIT and not is_captured and site_utils.should_capture_pokemon(pokemon_name):
+        if enemy_health <= pokemon_const.CAPTURE_HP_LIMIT and not is_captured and site_utils.should_capture_pokemon(
+                pokemon_name):
             for _ in range(pokemon_const.CAPTURE_TIMES_LIMIT):
                 global caught_ctr
                 global caught_failed_ctr
@@ -153,7 +159,13 @@ def do_actual_battle(driver: webdriver.Chrome, pokemon_name: str, pokemon_level:
         if own_health == 0 or enemy_health == 0:
             break
         # to "Continue" after an attack
-        site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input'), driver)
+        while True:
+            try:
+                site_utils.submit_naturally(driver.find_element_by_xpath(r'//*[@id="battleForm"]/div/input'), driver)
+                break
+            except Exception as e:
+                monitor_utils.error("Weird, got error for clicking on continue after an attack: " + str(e))
+
         time.sleep(SLEEP_BATTLE_ACTIONS)
 
     # to "Continue" at the end of a fight
@@ -179,7 +191,7 @@ def do_battle_if_exists(driver: webdriver.Chrome):
     monitor_utils.debug("Battle detected!")
     battle_btn, pokemon_name, pokemon_level, is_captured = battle_info
     monitor_utils.debug("Fighting %s at Level %d" % (pokemon_name, pokemon_level))
-    site_utils.click_on_element_naturally(battle_btn, driver)
+    site_utils.submit_naturally(battle_btn, driver)
     time.sleep(SLEEP_BATTLE_ACTIONS)
 
     do_actual_battle(driver, pokemon_name, pokemon_level, is_captured)
@@ -196,7 +208,7 @@ if __name__ == '__main__':
     while True:
         # try:
         login("gameburger2", "darealgameburger", driver2)
-        while not move_to_map(12, driver2):
+        while not move_to_map(18, driver2):
             login("gameburger2", "darealgameburger", driver2)
         while True:
             monitor_utils.debug(

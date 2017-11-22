@@ -39,7 +39,7 @@ def get_login_elements(driver: webdriver.Chrome):
 
 def get_battle_info(driver: webdriver.Chrome):
     # below two fetches just try and ensure the page is loaded
-    while True:
+    for _ in range(10):
         try:
             no_wild_elem = driver.find_element_by_xpath(r'//*[@id="pkmnappear"]/b')
             break
